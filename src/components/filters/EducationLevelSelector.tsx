@@ -18,10 +18,10 @@ interface EducationLevelSelectorProps {
   disabled?: boolean
 }
 
-export function EducationLevelSelector({ 
-  value, 
-  onChange, 
-  disabled 
+export function EducationLevelSelector({
+  value,
+  onChange,
+  disabled
 }: EducationLevelSelectorProps) {
   const [levels, setLevels] = useState<EducationLevel[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -32,7 +32,7 @@ export function EducationLevelSelector({
       const { data, error } = await supabase
         .from('education_levels')
         .select('*')
-        .order('name')
+        .order('level_order')
 
       if (!error && data) {
         setLevels(data)
@@ -46,12 +46,12 @@ export function EducationLevelSelector({
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled || isLoading}>
       <SelectTrigger>
-        <SelectValue placeholder={isLoading ? 'Loading...' : 'Pilih tingkat'} />
+        <SelectValue placeholder={isLoading ? 'Loading...' : 'Pilih tingkat pendidikan'} />
       </SelectTrigger>
       <SelectContent>
         {levels.map((level) => (
           <SelectItem key={level.id} value={level.id}>
-            {level.name} (Kelas {level.grades.join(', ')})
+            {level.name}
           </SelectItem>
         ))}
       </SelectContent>

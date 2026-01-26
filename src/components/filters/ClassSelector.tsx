@@ -13,27 +13,24 @@ import {
 import type { Class } from '@/types/database'
 
 interface ClassSelectorProps {
-  schoolId: string
   educationLevelId?: string
   value?: string
   onChange: (value: string) => void
   disabled?: boolean
-  multiple?: boolean
 }
 
-export function ClassSelector({ 
-  schoolId,
+export function ClassSelector({
   educationLevelId,
-  value, 
-  onChange, 
-  disabled 
+  value,
+  onChange,
+  disabled
 }: ClassSelectorProps) {
   const [classes, setClasses] = useState<Class[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     async function fetchClasses() {
-      if (!schoolId) {
+      if (!educationLevelId) {
         setClasses([])
         setIsLoading(false)
         return
@@ -41,17 +38,12 @@ export function ClassSelector({
 
       setIsLoading(true)
       const supabase = createClient()
-      
-      let query = supabase
+
+      const { data, error } = await supabase
         .from('classes')
         .select('*')
-        .eq('school_id', schoolId)
-
-      if (educationLevelId) {
-        query = query.eq('education_level_id', educationLevelId)
-      }
-
-      const { data, error } = await query.order('grade').order('section')
+        .eq('education_level_id', educationLevelId)
+        .order('name')
 
       if (!error && data) {
         setClasses(data)
@@ -60,29 +52,29 @@ export function ClassSelector({
     }
 
     fetchClasses()
-  }, [schoolId, educationLevelId])
+  }, [educationLevelId])
 
   return (
-    <Select 
-      value={value} 
-      onValueChange={onChange} 
-      disabled={disabled || isLoading || !schoolId}
+    <Select
+      value={value}
+      onValueChange={onChange}
+      disabled={disabled || isLoading || !educationLevelId}
     >
       <SelectTrigger>
-        <SelectValue 
+        <SelectValue
           placeholder={
-            !schoolId 
-              ? 'Pilih sekolah dulu' 
-              : isLoading 
-              ? 'Loading...' 
-              : 'Pilih kelas'
-          } 
+            !educationLevelId
+              ? 'Pilih tingkat pendidikan dulu'
+              : isLoading
+                ? 'Loading...'
+                : 'Pilih kelas'
+          }
         />
       </SelectTrigger>
       <SelectContent>
         {classes.map((cls) => (
           <SelectItem key={cls.id} value={cls.id}>
-            {cls.full_name} ({cls.student_count} siswa)
+            {cls.name}
           </SelectItem>
         ))}
       </SelectContent>

@@ -1,153 +1,198 @@
-// app/dashboard/siswa/page.tsx
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getSiswaDashboardStats, getRecentTryouts } from '@/app/actions/dashboard'
-import { BookOpen, ClipboardList, TrendingUp, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 
 export default async function SiswaDashboard() {
-  const { profile, stats } = await getSiswaDashboardStats()
-  const availableTryouts = await getRecentTryouts('siswa', 6)
+  const stats = await getSiswaDashboardStats()
+  const recentTryouts = await getRecentTryouts()
 
   return (
-    <DashboardLayout role="siswa">
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard Siswa</h1>
-          <p className="text-gray-500 mt-1">
-            Selamat belajar, <span className="font-medium text-gray-700">{profile.name}</span>!
-          </p>
-          {profile.schools && (
-            <p className="text-sm text-gray-500 mt-1">
-              📚 {profile.schools.name}
-            </p>
-          )}
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard Siswa</h1>
+        <p className="text-gray-600">Selamat datang kembali!</p>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-l-4 border-l-blue-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Tryout Tersedia
-              </CardTitle>
-              <BookOpen className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.availableTryouts}</div>
-              <p className="text-xs text-blue-600 mt-1">Siap untuk dikerjakan</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-green-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Tryout Selesai
-              </CardTitle>
-              <ClipboardList className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.completedTryouts}</div>
-              <p className="text-xs text-gray-500 mt-1">Total dikerjakan</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-purple-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Rata-rata Nilai
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.averageScore}</div>
-              <p className="text-xs text-gray-500 mt-1">Dari semua tryout</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Available Tryouts */}
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Tryout Tersedia</CardTitle>
-            <Link href="/dashboard/siswa/tryouts">
-              <Button variant="outline" size="sm">Lihat Semua</Button>
-            </Link>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Tryout Tersedia
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {availableTryouts.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium mb-2">Belum ada tryout tersedia</h3>
-                <p className="text-sm">Tryout baru akan muncul di sini</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {availableTryouts.map((tryout: any) => (
-                  <Card key={tryout.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-base">{tryout.title}</CardTitle>
-                          <div className="flex items-center gap-2 mt-2">
-                            {tryout.is_global ? (
-                              <Badge variant="default" className="text-xs">Global</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs">Sekolah</Badge>
-                            )}
-                            {tryout.pricing_model === 'free' ? (
-                              <Badge variant="outline" className="text-xs text-green-600">Gratis</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs text-blue-600">Premium</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm text-gray-600 mb-4">
-                        <div className="flex items-center gap-2">
-                          <span>📚</span>
-                          <span>{tryout.subjects?.name || 'Umum'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>⏱️</span>
-                          <span>{tryout.duration_minutes} menit</span>
-                        </div>
-                        {tryout.education_levels && (
-                          <div className="flex items-center gap-2">
-                            <span>🎓</span>
-                            <span>{tryout.education_levels.name}</span>
-                          </div>
-                        )}
-                      </div>
-                      <Link href={`/dashboard/siswa/tryouts/${tryout.id}`}>
-                        <Button className="w-full">
-                          <Play className="mr-2 h-4 w-4" />
-                          Mulai Tryout
-                        </Button>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            <div className="text-2xl font-bold">{stats.availableTryouts}</div>
+            <p className="text-xs text-muted-foreground">
+              Tryout yang bisa kamu kerjakan
+            </p>
           </CardContent>
         </Card>
 
-        {/* Recent Results */}
         <Card>
-          <CardHeader>
-            <CardTitle>Hasil Tryout Terbaru</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Sudah Dikerjakan
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500">Coming soon...</p>
+            <div className="text-2xl font-bold">{stats.completedTryouts}</div>
+            <p className="text-xs text-muted-foreground">
+              Tryout yang sudah selesai
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Rata-rata Nilai
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats.averageScore || '-'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Dari semua tryout
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Peringkat
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">#{stats.rank}</div>
+            <p className="text-xs text-muted-foreground">
+              Di leaderboard
+            </p>
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+
+      {/* Recent Tryouts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tryout Terbaru</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentTryouts.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">
+              Belum ada tryout tersedia
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {recentTryouts.map((tryout: {
+                id: string
+                title: string
+                description: string | null
+                duration_minutes: number | null
+                pricing_model: string | null
+                tryout_price: number | null
+                explanation_price: number | null
+                creator: { name: string; role: string } | null
+              }) => (
+                <div 
+                  key={tryout.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold">{tryout.title}</h3>
+                    <p className="text-sm text-gray-600">
+                      {tryout.description || 'Tidak ada deskripsi'}
+                    </p>
+                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                      <span>⏱️ {tryout.duration_minutes || '-'} menit</span>
+                      <span>
+                        👤 {tryout.creator?.name || 'Unknown'} ({tryout.creator?.role || '-'})
+                      </span>
+                      {tryout.pricing_model === 'free' && (
+                        <span className="text-green-600 font-medium">🎉 GRATIS</span>
+                      )}
+                      {tryout.pricing_model === 'freemium' && (
+                        <span className="text-blue-600 font-medium">
+                          💰 Pembahasan Rp {tryout.explanation_price?.toLocaleString()}
+                        </span>
+                      )}
+                      {tryout.pricing_model === 'premium' && (
+                        <span className="text-purple-600 font-medium">
+                          💎 Premium Rp {tryout.tryout_price?.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/tryout/${tryout.id}`}>
+                      <Button variant="outline" size="sm">
+                        Lihat Detail
+                      </Button>
+                    </Link>
+                    <Link href={`/tryout/${tryout.id}/start`}>
+                      <Button size="sm">
+                        Mulai
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Submissions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Riwayat Tryout</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!stats.recentSubmissions || stats.recentSubmissions.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">
+              Belum ada riwayat tryout
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {stats.recentSubmissions.map((submission: {
+                id: string
+                total_score: number | null
+                submitted_at: string
+                tryout: { title: string } | null
+              }) => (
+                <div 
+                  key={submission.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div>
+                    <h3 className="font-semibold">
+                      {submission.tryout?.title || 'Unknown Tryout'}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {new Date(submission.submitted_at).toLocaleDateString('id-ID', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {submission.total_score || 0}
+                    </div>
+                    <p className="text-xs text-gray-500">Nilai</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

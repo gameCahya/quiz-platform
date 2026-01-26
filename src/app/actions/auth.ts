@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { RegisterData, LoginData } from '@/types/auth'
+import type { ProfileInsert } from '@/types/database'
 
 export async function register(data: RegisterData) {
   const supabase = await createClient()
@@ -23,6 +24,14 @@ export async function register(data: RegisterData) {
 
   if (signUpError) {
     console.error('❌ Sign up error:', signUpError)
+    
+    // Check if it's rate limit error
+    if (signUpError.message.includes('rate limit')) {
+      return { 
+        error: 'Too many registration attempts. Please try again in 1 hour or contact admin.'
+      }
+    }
+    
     return { error: signUpError.message }
   }
 
@@ -33,48 +42,53 @@ export async function register(data: RegisterData) {
 
   console.log('✅ Auth user created:', authData.user.id)
 
-  // 2. Prepare profile data
-  const profileData: any = {
+  // 2. Check if profile already exists (edge case)
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', authData.user.id)
+    .single()
+
+  if (existingProfile) {
+    console.log('ℹ️ Profile already exists, skipping insert')
+    revalidatePath('/', 'layout')
+    return { 
+      success: true,
+      redirectTo: `/dashboard/${data.role}`
+    }
+  }
+
+  // 3. Prepare profile data - FIX: Replace `any` with proper type
+
+  const profileData: ProfileInsert = {
     id: authData.user.id,
     email: data.email,
     name: data.name,
     role: data.role,
+    school_id: null,
+    education_level_id: null,
+    class_id: null,
   }
 
-  // Add foreign keys only for guru/siswa (not admin)
   if (data.role !== 'admin') {
-    if (data.school_id) {
-      profileData.school_id = data.school_id
-    }
-    if (data.education_level_id) {
-      profileData.education_level_id = data.education_level_id
-    }
-    if (data.class_id) {
-      profileData.class_id = data.class_id
-    }
+    if (data.school_id) profileData.school_id = data.school_id
+    if (data.education_level_id) profileData.education_level_id = data.education_level_id
+    if (data.class_id) profileData.class_id = data.class_id
   }
 
   console.log('📝 Creating profile with data:', profileData)
 
-  // 3. Insert profile
+  // 4. Insert profile
   const { error: profileError } = await supabase
     .from('profiles')
     .insert(profileData)
 
   if (profileError) {
     console.error('❌ Profile insert error:', profileError)
-    console.error('Error details:', {
-      message: profileError.message,
-      details: profileError.details,
-      hint: profileError.hint,
-      code: profileError.code
-    })
-    
-    // Rollback: delete auth user
-    await supabase.auth.admin.deleteUser(authData.user.id)
     
     return { 
-      error: `Profile creation failed: ${profileError.message}`
+      error: `Profile creation failed: ${profileError.message}. User account was created but profile is incomplete. Please contact admin.`,
+      userId: authData.user.id
     }
   }
 
@@ -113,16 +127,17 @@ export async function login(data: LoginData) {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, name, email')
     .eq('id', user.id)
     .single()
 
   if (profileError || !profile) {
     console.error('❌ Profile not found:', profileError)
-    return { error: 'Profile not found' }
+    return { error: 'Profile not found. Please contact admin.' }
   }
 
-  console.log('✅ Profile loaded, role:', profile.role)
+  console.log('✅ Profile loaded:', profile)
+  console.log('✅ Redirecting to:', `/dashboard/${profile.role}`)
 
   revalidatePath('/', 'layout')
   

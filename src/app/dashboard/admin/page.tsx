@@ -1,158 +1,147 @@
-// app/dashboard/admin/page.tsx
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getAdminDashboardStats, getRecentTryouts } from '@/app/actions/dashboard'
-import { Users, FileText, School, TrendingUp } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
+import { getAdminDashboardStats } from '@/app/actions/dashboard'
 
 export default async function AdminDashboard() {
-  const { profile, stats } = await getAdminDashboardStats()
-  const recentTryouts = await getRecentTryouts('admin', 5)
+  const supabase = await createClient()
+  
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, name, email, role')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile) {
+    console.error('Profile error:', profileError)
+    redirect('/login')
+  }
+
+  // Verify user is admin
+  if (profile.role !== 'admin') {
+    console.error('Access denied: user is not admin, role:', profile.role)
+    redirect(`/dashboard/${profile.role}`)
+  }
+
+  // Get dashboard stats
+  const stats = await getAdminDashboardStats()
 
   return (
-    <DashboardLayout role="admin">
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard Admin</h1>
-          <p className="text-gray-500 mt-1">
-            Selamat datang kembali, <span className="font-medium text-gray-700">{profile.name}</span>!
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard Admin</h1>
+        <p className="text-gray-500 mt-1">
+          Selamat datang kembali, <span className="font-medium text-gray-700">{profile.name}</span>!
+        </p>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total Users
-              </CardTitle>
-              <Users className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
-              <p className="text-xs text-gray-500 mt-1">Admin, Guru, dan Siswa</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total Tryout
-              </CardTitle>
-              <FileText className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTryouts.toLocaleString()}</div>
-              <p className="text-xs text-gray-500 mt-1">Tryout yang tersedia</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Sekolah Terdaftar
-              </CardTitle>
-              <School className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalSchools.toLocaleString()}</div>
-              <p className="text-xs text-gray-500 mt-1">Sekolah aktif</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Revenue
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Rp {stats.revenue.toLocaleString()}</div>
-              <p className="text-xs text-gray-500 mt-1">Total pendapatan</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Tryouts - sisanya sama seperti sebelumnya */}
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Tryout Terbaru</CardTitle>
-            <Link href="/dashboard/admin/tryouts">
-              <Button variant="outline" size="sm">Lihat Semua</Button>
-            </Link>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
           </CardHeader>
           <CardContent>
-            {recentTryouts.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>Belum ada tryout</p>
-                <Link href="/dashboard/admin/tryouts/create">
-                  <Button className="mt-4" size="sm">Buat Tryout Pertama</Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentTryouts.map((tryout: any) => (
-                  <div
-                    key={tryout.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <h3 className="font-medium">{tryout.title}</h3>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                        <span>{tryout.subjects?.name || 'Umum'}</span>
-                        <span>•</span>
-                        <span>{tryout.education_levels?.name || 'Semua Tingkat'}</span>
-                        <span>•</span>
-                        <span>{tryout.duration_minutes} menit</span>
-                      </div>
-                    </div>
-                    <Link href={`/dashboard/admin/tryouts/${tryout.id}`}>
-                      <Button variant="ghost" size="sm">Lihat</Button>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="text-2xl font-bold">{stats.totalUsers}</div>
+            <p className="text-xs text-muted-foreground">Registered users</p>
           </CardContent>
         </Card>
 
-        {/* Quick Actions - sama seperti sebelumnya */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/dashboard/admin/tryouts/create">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                <FileText className="h-10 w-10 text-blue-500 mb-3" />
-                <h3 className="font-medium mb-1">Buat Tryout Baru</h3>
-                <p className="text-sm text-gray-500">Buat tryout global untuk semua siswa</p>
-              </CardContent>
-            </Card>
-          </Link>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Schools</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalSchools}</div>
+            <p className="text-xs text-muted-foreground">Active schools</p>
+          </CardContent>
+        </Card>
 
-          <Link href="/dashboard/admin/schools">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                <School className="h-10 w-10 text-green-500 mb-3" />
-                <h3 className="font-medium mb-1">Kelola Sekolah</h3>
-                <p className="text-sm text-gray-500">Tambah atau edit data sekolah</p>
-              </CardContent>
-            </Card>
-          </Link>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tryouts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalTryouts}</div>
+            <p className="text-xs text-muted-foreground">Created tryouts</p>
+          </CardContent>
+        </Card>
 
-          <Link href="/dashboard/admin/users">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                <Users className="h-10 w-10 text-purple-500 mb-3" />
-                <h3 className="font-medium mb-1">Kelola Users</h3>
-                <p className="text-sm text-gray-500">Lihat dan kelola semua pengguna</p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
+            <p className="text-xs text-muted-foreground">Completed tryouts</p>
+          </CardContent>
+        </Card>
       </div>
-    </DashboardLayout>
+
+      {/* Recent Tryouts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Tryouts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats.recentTryouts.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No tryouts yet</p>
+          ) : (
+            <div className="space-y-4">
+              {stats.recentTryouts.map((tryout) => (
+                <div key={tryout.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-semibold">{tryout.title}</h3>
+                    <p className="text-sm text-gray-600">
+                      By: {tryout.creator?.name || 'Unknown'}
+                    </p>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {new Date(tryout.created_at).toLocaleDateString('id-ID')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Submissions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Submissions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats.recentSubmissions.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No submissions yet</p>
+          ) : (
+            <div className="space-y-4">
+              {stats.recentSubmissions.map((submission) => (
+                <div key={submission.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-semibold">{submission.tryout?.title || 'Unknown Tryout'}</h3>
+                    <p className="text-sm text-gray-600">
+                      By: {submission.user?.name || 'Unknown'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold">{submission.total_score || 0}</div>
+                    <p className="text-xs text-gray-500">Score</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

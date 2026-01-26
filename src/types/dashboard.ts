@@ -1,24 +1,69 @@
-// types/dashboard.ts
-export interface AdminStats {
+export interface AdminDashboardStats {
   totalUsers: number
-  totalTryouts: number
   totalSchools: number
-  revenue: number
-}
-
-export interface GuruStats {
   totalTryouts: number
-  totalStudents: number
   totalSubmissions: number
+  recentTryouts: AdminRecentTryout[]
+  recentSubmissions: AdminRecentSubmission[]
 }
 
-export interface SiswaStats {
+export interface GuruDashboardStats {
+  totalStudents: number
+  totalTryouts: number
+  totalSubmissions: number
+  myTryouts: MyTryout[]
+}
+
+export interface SiswaDashboardStats {
   availableTryouts: number
   completedTryouts: number
   averageScore: number
+  rank: number
+  recentSubmissions: SiswaRecentSubmission[]
 }
 
-export interface DashboardData<T> {
-  profile: any // You can replace with Profile type
-  stats: T
+// Tryout types
+export interface AdminRecentTryout {
+  id: string
+  title: string
+  description: string | null
+  duration_minutes: number | null
+  pricing_model: string | null
+  tryout_price: number | null
+  explanation_price: number | null
+  start_time: string | null
+  end_time: string | null
+  created_at: string
+  creator: {
+    name: string
+    role: string
+  } | null
+}
+
+export interface MyTryout {
+  id: string
+  title: string
+  created_at: string
+}
+
+// Submission types
+export interface AdminRecentSubmission {
+  id: string
+  total_score: number | null
+  submitted_at: string
+  user: {
+    name: string
+  } | null
+  tryout: {
+    title: string
+  } | null
+}
+
+export interface SiswaRecentSubmission {
+  id: string
+  total_score: number | null
+  submitted_at: string
+  tryout: {
+    title: string
+  } | null
 }

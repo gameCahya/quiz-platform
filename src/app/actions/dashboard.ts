@@ -4,8 +4,42 @@ import { createClient } from '@/lib/supabase/server'
 import type { 
   AdminDashboardStats, 
   GuruDashboardStats, 
-  SiswaDashboardStats 
+  SiswaDashboardStats,
+  AdminRecentTryout,
+  AdminRecentSubmission,
+  SiswaRecentSubmission,
+  MyTryout
 } from '@/types/dashboard'
+
+// Type for raw Supabase response (before transformation)
+type SupabaseTryoutResponse = {
+  id: string
+  title: string
+  description: string | null
+  duration_minutes: number | null
+  pricing_model: string | null
+  tryout_price: number | null
+  explanation_price: number | null
+  start_time: string | null
+  end_time: string | null
+  created_at: string
+  creator: Array<{
+    name: string
+    role: string
+  }>
+}
+
+type SupabaseSubmissionResponse = {
+  id: string
+  total_score: number | null
+  submitted_at: string
+  user?: Array<{
+    name: string
+  }>
+  tryout: Array<{
+    title: string
+  }>
+}
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   const supabase = await createClient()
@@ -24,19 +58,42 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   ])
 
   // Get recent tryouts
-  const { data: recentTryouts } = await supabase
+  const { data: recentTryoutsRaw } = await supabase
     .from('tryouts')
     .select(`
       id,
       title,
+      description,
+      duration_minutes,
+      pricing_model,
+      tryout_price,
+      explanation_price,
+      start_time,
+      end_time,
       created_at,
-      creator:profiles!tryouts_creator_id_fkey(name)
+      creator:profiles!tryouts_creator_id_fkey(name, role)
     `)
     .order('created_at', { ascending: false })
     .limit(5)
+    .returns<SupabaseTryoutResponse[]>()
+
+  // Transform: array creator to object
+  const recentTryouts: AdminRecentTryout[] = (recentTryoutsRaw || []).map((tryout) => ({
+    id: tryout.id,
+    title: tryout.title,
+    description: tryout.description,
+    duration_minutes: tryout.duration_minutes,
+    pricing_model: tryout.pricing_model,
+    tryout_price: tryout.tryout_price,
+    explanation_price: tryout.explanation_price,
+    start_time: tryout.start_time,
+    end_time: tryout.end_time,
+    created_at: tryout.created_at,
+    creator: tryout.creator?.[0] || null
+  }))
 
   // Get recent submissions
-  const { data: recentSubmissions } = await supabase
+  const { data: recentSubmissionsRaw } = await supabase
     .from('submissions')
     .select(`
       id,
@@ -47,14 +104,24 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     `)
     .order('submitted_at', { ascending: false })
     .limit(5)
+    .returns<SupabaseSubmissionResponse[]>()
+
+  // Transform: array relations to objects
+  const recentSubmissions: AdminRecentSubmission[] = (recentSubmissionsRaw || []).map((sub) => ({
+    id: sub.id,
+    total_score: sub.total_score,
+    submitted_at: sub.submitted_at,
+    user: sub.user?.[0] || null,
+    tryout: sub.tryout?.[0] || null
+  }))
 
   return {
     totalUsers: totalUsers || 0,
     totalSchools: totalSchools || 0,
     totalTryouts: totalTryouts || 0,
     totalSubmissions: totalSubmissions || 0,
-    recentTryouts: recentTryouts || [],
-    recentSubmissions: recentSubmissions || []
+    recentTryouts,
+    recentSubmissions
   }
 }
 
@@ -65,7 +132,6 @@ export async function getGuruDashboardStats(): Promise<GuruDashboardStats> {
   
   if (!user) throw new Error('Not authenticated')
 
-  // Get guru profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('school_id')
@@ -76,7 +142,6 @@ export async function getGuruDashboardStats(): Promise<GuruDashboardStats> {
     throw new Error('School not found')
   }
 
-  // Get counts for guru's school
   const [
     { count: totalStudents },
     { count: totalTryouts },
@@ -94,21 +159,15 @@ export async function getGuruDashboardStats(): Promise<GuruDashboardStats> {
     supabase
       .from('submissions')
       .select('*', { count: 'exact', head: true })
-      .in('tryout_id', 
-        supabase
-          .from('tryouts')
-          .select('id')
-          .eq('creator_id', user.id)
-      )
   ])
 
-  // Get my tryouts
   const { data: myTryouts } = await supabase
     .from('tryouts')
     .select('id, title, created_at')
     .eq('creator_id', user.id)
     .order('created_at', { ascending: false })
     .limit(5)
+    .returns<MyTryout[]>()
 
   return {
     totalStudents: totalStudents || 0,
@@ -125,20 +184,33 @@ export async function getSiswaDashboardStats(): Promise<SiswaDashboardStats> {
   
   if (!user) throw new Error('Not authenticated')
 
-  // Get available tryouts count
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('school_id')
+    .eq('id', user.id)
+    .single()
+
   const { count: availableTryouts } = await supabase
     .from('tryouts')
     .select('*', { count: 'exact', head: true })
-    .or('is_global.eq.true,school_id.eq.' + user.user_metadata.school_id)
+    .or(`is_global.eq.true,school_id.eq.${profile?.school_id || 'null'}`)
 
-  // Get my submissions count
   const { count: completedTryouts } = await supabase
     .from('submissions')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
 
-  // Get my recent submissions
-  const { data: recentSubmissions } = await supabase
+  // Define type for raw response
+  type RawSubmission = {
+    id: string
+    total_score: number | null
+    submitted_at: string
+    tryout: Array<{
+      title: string
+    }>
+  }
+
+  const { data: recentSubmissionsRaw } = await supabase
     .from('submissions')
     .select(`
       id,
@@ -149,8 +221,20 @@ export async function getSiswaDashboardStats(): Promise<SiswaDashboardStats> {
     .eq('user_id', user.id)
     .order('submitted_at', { ascending: false })
     .limit(5)
+    .returns<RawSubmission[]>()
 
-  // Get my rank (simplified - needs proper leaderboard logic)
+  // Transform to match type
+  const recentSubmissions: SiswaRecentSubmission[] = (recentSubmissionsRaw || []).map((sub) => ({
+    id: sub.id,
+    total_score: sub.total_score,
+    submitted_at: sub.submitted_at,
+    tryout: sub.tryout?.[0] || null
+  }))
+
+  const averageScore = recentSubmissions.length > 0
+    ? recentSubmissions.reduce((sum, s) => sum + (s.total_score || 0), 0) / recentSubmissions.length
+    : 0
+
   const { count: betterScores } = await supabase
     .from('submissions')
     .select('*', { count: 'exact', head: true })
@@ -159,8 +243,71 @@ export async function getSiswaDashboardStats(): Promise<SiswaDashboardStats> {
   return {
     availableTryouts: availableTryouts || 0,
     completedTryouts: completedTryouts || 0,
-    averageScore: 0, // Calculate later
+    averageScore: Math.round(averageScore),
     rank: (betterScores || 0) + 1,
-    recentSubmissions: recentSubmissions || []
+    recentSubmissions
   }
+}
+
+export async function getRecentTryouts() {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('school_id, role')
+    .eq('id', user.id)
+    .single()
+
+  let query = supabase
+    .from('tryouts')
+    .select(`
+      id,
+      title,
+      description,
+      duration_minutes,
+      pricing_model,
+      tryout_price,
+      explanation_price,
+      start_time,
+      end_time,
+      created_at,
+      creator:profiles!tryouts_creator_id_fkey(name, role)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (profile?.role === 'siswa') {
+    query = query.or(`is_global.eq.true,school_id.eq.${profile.school_id || 'null'}`)
+  } else if (profile?.role === 'guru') {
+    query = query.or(`creator_id.eq.${user.id},is_global.eq.true`)
+  }
+
+  const { data: tryoutsRaw, error } = await query
+    .limit(10)
+    .returns<SupabaseTryoutResponse[]>()
+
+  if (error) {
+    console.error('Error fetching tryouts:', error)
+    return []
+  }
+
+  // Transform creator from array to object
+  const tryouts = (tryoutsRaw || []).map((t) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    duration_minutes: t.duration_minutes,
+    pricing_model: t.pricing_model,
+    tryout_price: t.tryout_price,
+    explanation_price: t.explanation_price,
+    start_time: t.start_time,
+    end_time: t.end_time,
+    created_at: t.created_at,
+    creator: t.creator?.[0] || null
+  }))
+
+  return tryouts
 }
