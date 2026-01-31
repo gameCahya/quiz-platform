@@ -1,112 +1,55 @@
-// src/components/layout/Header.tsx
-'use client'
-
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { LogOut, User, Settings } from 'lucide-react'
-import { logout } from '@/app/actions/auth'
-import type { Profile } from '@/types/database'
+import { UserDropdown } from '@/components/layout/UserDropdown'
 
-interface HeaderProps {
-  role: 'admin' | 'guru' | 'siswa'
+type HeaderProps = {
+  user: {
+    name: string
+    email: string
+    role: 'admin' | 'guru' | 'siswa'
+  }
+  onToggleSidebar?: () => void
 }
 
-export function Header({ role }: HeaderProps) {
-  const [profile, setProfile] = useState<Profile | null>(null)
-
-  useEffect(() => {
-    async function fetchProfile() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-
-        if (data) setProfile(data)
-      }
-    }
-
-    fetchProfile()
-  }, [])
-
-  const getRoleLabel = () => {
-    switch (role) {
-      case 'admin': return 'Administrator'
-      case 'guru': return 'Guru'
-      case 'siswa': return 'Siswa'
-    }
-  }
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
+/**
+ * Dashboard Header Component
+ * Displays at the top of all dashboard pages
+ * Includes mobile menu toggle and user dropdown with logout
+ */
+export function Header({ user, onToggleSidebar }: HeaderProps) {
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl font-bold text-blue-600">
-            Quiz Platform
-          </div>
-          <div className="text-sm text-gray-500">
-            {getRoleLabel()}
+    <header className="sticky top-0 z-40 w-full border-b bg-white">
+      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+        {/* Left side: Mobile menu toggle + Logo/Title */}
+        <div className="flex items-center gap-4">
+          {/* Mobile menu toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onToggleSidebar}
+          >
+            <Menu className="h-6 w-6" />
+            <span className="sr-only">Toggle menu</span>
+          </Button>
+
+          {/* Logo/Title */}
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+              <span className="text-lg font-bold text-white">Q</span>
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-lg font-semibold">Quiz Platform</h1>
+            </div>
           </div>
         </div>
 
+        {/* Right side: User dropdown */}
         <div className="flex items-center gap-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar>
-                  <AvatarImage src={profile?.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {profile ? getInitials(profile.name) : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{profile?.name}</p>
-                  <p className="text-xs text-gray-500">{profile?.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()} className="text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* You can add notification bell, search, etc here */}
+          
+          {/* User Dropdown with Logout */}
+          <UserDropdown user={user} />
         </div>
       </div>
     </header>

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { RegisterData, LoginData } from '@/types/auth'
 import type { ProfileInsert } from '@/types/database'
+import { redirect } from 'next/navigation'
 
 export async function register(data: RegisterData) {
   const supabase = await createClient()
@@ -149,17 +150,21 @@ export async function login(data: LoginData) {
 
 export async function logout() {
   const supabase = await createClient()
-  
+
+  // Sign out from Supabase
   const { error } = await supabase.auth.signOut()
-  
+
   if (error) {
-    return { error: error.message }
+    console.error('Logout error:', error)
+    return {
+      success: false,
+      error: error.message,
+    }
   }
 
+  // Revalidate all pages to clear cached data
   revalidatePath('/', 'layout')
-  
-  return {
-    success: true,
-    redirectTo: '/login'
-  }
+
+  // Redirect to login page
+  redirect('/login')
 }
