@@ -14,11 +14,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+type UserRole = 'admin' | 'guru' | 'siswa'
+
 export function RegisterForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [role, setRole] = useState<'admin' | 'guru' | 'siswa'>('siswa')
+  const [role, setRole] = useState<UserRole>('siswa')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -60,9 +62,10 @@ export function RegisterForm() {
         setError('Registration completed but redirect failed')
         setIsLoading(false)
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Unexpected error:', err)
-      setError(err.message || 'An unexpected error occurred')
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
+      setError(errorMessage)
       setIsLoading(false)
     }
   }
@@ -117,7 +120,7 @@ export function RegisterForm() {
         <Label htmlFor="role">Role</Label>
         <Select 
           value={role} 
-          onValueChange={(value: any) => setRole(value)}
+          onValueChange={(value: UserRole) => setRole(value)}
           disabled={isLoading}
         >
           <SelectTrigger>

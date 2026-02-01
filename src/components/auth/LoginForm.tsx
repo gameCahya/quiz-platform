@@ -48,9 +48,10 @@ export function LoginForm() {
         setError('Login completed but redirect failed')
         setIsLoading(false)
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Unexpected error:', err)
-      setError(err.message || 'An unexpected error occurred')
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
+      setError(errorMessage)
       setIsLoading(false)
     }
   }
@@ -93,7 +94,7 @@ export function LoginForm() {
       </Button>
 
       <p className="text-center text-sm text-gray-600">
-        Don't have an account?{' '}
+        Don&apos;t have an account?{' '}
         <Link href="/register" className="text-blue-600 hover:underline">
           Register
         </Link>
