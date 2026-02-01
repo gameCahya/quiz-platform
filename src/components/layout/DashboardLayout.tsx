@@ -25,19 +25,19 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - with logout button */}
+      {/* Header - fixed at top */}
       <Header
         user={user}
         onToggleSidebar={() => setSidebarOpen(true)}
       />
 
-      <div className="flex">
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:fixed lg:inset-y-0 lg:z-30 lg:mt-16 lg:flex lg:w-64 lg:flex-col">
+      <div className="flex h-[calc(100vh-4rem)]">
+        {/* Desktop Sidebar - fixed on left */}
+        <aside className="hidden w-64 border-r bg-white lg:block">
           <Sidebar role={user.role} />
         </aside>
 
-        {/* Mobile Sidebar */}
+        {/* Mobile Sidebar - sheet overlay */}
         <MobileSidebar
           role={user.role}
           open={sidebarOpen}
@@ -45,8 +45,8 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
         />
 
         {/* Main Content */}
-        <main className="flex-1 lg:pl-64">
-          <div className="py-6 px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 overflow-y-auto">
+          <div className="px-4 py-6 sm:px-6 lg:px-8">
             {children}
           </div>
         </main>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut, User, Settings, ChevronDown } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
@@ -88,7 +88,7 @@ export function UserDropdown({ user }: UserDropdownProps) {
           className="relative h-10 gap-2 px-2 hover:bg-gray-100"
         >
           <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm font-semibold">
+            <AvatarFallback className="bg-linear-to-br from-blue-500 to-purple-600 text-white text-sm font-semibold">
               {getInitials(user.name)}
             </AvatarFallback>
           </Avatar>

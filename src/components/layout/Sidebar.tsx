@@ -1,4 +1,3 @@
-// components/layout/Sidebar.tsx
 'use client'
 
 import Link from 'next/link'
@@ -16,6 +15,7 @@ import {
   PlusCircle,
   BarChart3,
   GraduationCap,
+  type LucideIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -24,7 +24,7 @@ interface SidebarProps {
 }
 
 interface MenuItem {
-  icon: any
+  icon: LucideIcon // âœ… Use LucideIcon type instead of any
   label: string
   href: string
   badge?: string
@@ -148,51 +148,49 @@ export function Sidebar({ role }: SidebarProps) {
   const menu = role === 'admin' ? adminMenu : role === 'guru' ? guruMenu : siswaMenu
 
   return (
-    <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col lg:pt-[73px] bg-white border-r border-gray-200">
-      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {menu.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+    <div className="flex h-full flex-col bg-white">
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        {menu.map((item) => {
+          const Icon = item.icon
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200',
-                  isActive
-                    ? 'bg-blue-50 text-blue-700 shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                )}
-              >
-                <div className="flex items-center">
-                  <Icon className={cn(
-                    "mr-3 h-5 w-5 transition-colors",
-                    isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"
-                  )} />
-                  <span>{item.label}</span>
-                </div>
-                {item.badge && (
-                  <Badge 
-                    variant={isActive ? "default" : "secondary"} 
-                    className="ml-auto text-xs"
-                  >
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                isActive
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+              )}
+            >
+              <div className="flex items-center">
+                <Icon className={cn(
+                  "mr-3 h-5 w-5 transition-colors",
+                  isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"
+                )} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge && (
+                <Badge 
+                  variant={isActive ? "default" : "secondary"} 
+                  className="ml-auto text-xs"
+                >
+                  {item.badge}
+                </Badge>
+              )}
+            </Link>
+          )
+        })}
+      </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="text-xs text-gray-500 text-center">
-            Quiz Platform v1.0
-          </div>
+      {/* Footer */}
+      <div className="border-t p-4">
+        <div className="text-center text-xs text-gray-500">
+          Quiz Platform v1.0
         </div>
       </div>
-    </aside>
+    </div>
   )
 }

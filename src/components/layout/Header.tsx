@@ -35,7 +35,7 @@ export function Header({ user, onToggleSidebar }: HeaderProps) {
 
           {/* Logo/Title */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-blue-600 to-purple-600">
               <span className="text-lg font-bold text-white">Q</span>
             </div>
             <div className="hidden sm:block">
