@@ -248,7 +248,7 @@ export async function deleteQuestion(questionId: string) {
     // Get question with tryout info
     const { data: question } = await supabase
       .from('questions')
-      .select('id, tryout_id, tryouts(creator_id)')
+      .select('id, tryout_id, question_number, tryouts(creator_id)')
       .eq('id', questionId)
       .single()
 
@@ -265,12 +265,43 @@ export async function deleteQuestion(questionId: string) {
       return { success: false, error: 'No permission to delete this question' }
     }
 
+    const deletedQuestionNumber = question.question_number
+
     // Delete question
     const { error } = await supabase.from('questions').delete().eq('id', questionId)
 
     if (error) {
       console.error('Delete question error:', error)
       return { success: false, error: error.message }
+    }
+
+    // Reorder remaining questions (decrement numbers after deleted question)
+    const { error: reorderError } = await supabase.rpc('reorder_questions_after_delete', {
+      p_tryout_id: question.tryout_id,
+      p_deleted_number: deletedQuestionNumber,
+    })
+
+    // If RPC doesn't exist, do it manually
+    if (reorderError) {
+      console.log('RPC not found, reordering manually...')
+      
+      // Get all questions after the deleted one
+      const { data: questionsToReorder } = await supabase
+        .from('questions')
+        .select('id, question_number')
+        .eq('tryout_id', question.tryout_id)
+        .gt('question_number', deletedQuestionNumber)
+        .order('question_number')
+
+      // Update each question number
+      if (questionsToReorder && questionsToReorder.length > 0) {
+        for (const q of questionsToReorder) {
+          await supabase
+            .from('questions')
+            .update({ question_number: q.question_number - 1 })
+            .eq('id', q.id)
+        }
+      }
     }
 
     revalidatePath(`/dashboard/admin/tryouts/${question.tryout_id}/questions`)
