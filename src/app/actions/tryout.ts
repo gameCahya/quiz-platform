@@ -9,6 +9,7 @@ import type {
   TryoutWithQuestions,
   TryoutFilters,
   TryoutSort,
+  TryoutRow,           // ← ADD THIS LINE
 } from '@/types/tryout'
 
 /**
@@ -327,11 +328,17 @@ export async function getTryoutById(id: string) {
 // ============================================
 // UPDATE
 // ============================================
+// ADD THIS TO: src/app/actions/tryout.ts
+// Replace the existing updateTryout function
 
-/**
- * Update tryout
- */
-export async function updateTryout(input: UpdateTryoutInput) {
+// ============================================
+// UPDATE TRYOUT
+// ============================================
+
+export async function updateTryout(
+  tryoutId: string,
+  input: UpdateTryoutInput
+) {
   try {
     const supabase = await createClient()
 
@@ -341,81 +348,87 @@ export async function updateTryout(input: UpdateTryoutInput) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return {
-        success: false,
-        error: 'Unauthorized',
-      }
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Get user profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, role')
+      .select('id, role, school_id')
       .eq('id', user.id)
       .single()
 
     if (!profile) {
-      return {
-        success: false,
-        error: 'Profile not found',
-      }
+      return { success: false, error: 'Profile not found' }
     }
 
-    // Check if tryout exists and user has permission
+    // Get existing tryout for permission check
     const { data: existingTryout } = await supabase
       .from('tryouts')
-      .select('id, creator_id')
-      .eq('id', input.id)
+      .select('creator_id, school_id')
+      .eq('id', tryoutId)
       .single()
 
     if (!existingTryout) {
-      return {
-        success: false,
-        error: 'Tryout not found',
-      }
+      return { success: false, error: 'Tryout not found' }
     }
 
-    // Check permissions
-    if (profile.role === 'guru' && existingTryout.creator_id !== user.id) {
-      return {
-        success: false,
-        error: 'You can only edit your own tryouts',
-      }
+    // Permission check
+    const isOwner = existingTryout.creator_id === profile.id
+    const isAdmin = profile.role === 'admin'
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: 'No permission to update this tryout' }
+    }
+
+    // For guru, ensure they're not trying to change school
+    if (profile.role === 'guru' && input.school_id && input.school_id !== profile.school_id) {
+      return { success: false, error: 'Cannot change tryout to different school' }
+    }
+
+    // Build update data
+    const updateData: Record<string, unknown> = {}
+    
+    if (input.title !== undefined) updateData.title = input.title
+    if (input.description !== undefined) updateData.description = input.description
+    if (input.pricing_model !== undefined) updateData.pricing_model = input.pricing_model
+    if (input.tryout_price !== undefined) updateData.tryout_price = input.tryout_price
+    if (input.explanation_price !== undefined) updateData.explanation_price = input.explanation_price
+    if (input.has_explanation !== undefined) updateData.has_explanation = input.has_explanation
+    if (input.duration_minutes !== undefined) updateData.duration_minutes = input.duration_minutes
+    if (input.start_time !== undefined) updateData.start_time = input.start_time
+    if (input.end_time !== undefined) updateData.end_time = input.end_time
+    
+    // Only admin can change is_global and school_id
+    if (profile.role === 'admin') {
+      if (input.is_global !== undefined) updateData.is_global = input.is_global
+      if (input.school_id !== undefined) updateData.school_id = input.school_id
     }
 
     // Update tryout
-    const { id, ...updateData } = input
     const { data: tryout, error } = await supabase
       .from('tryouts')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', tryoutId)
       .select()
       .single()
 
     if (error) {
       console.error('Update tryout error:', error)
-      return {
-        success: false,
-        error: error.message,
-      }
+      return { success: false, error: error.message }
     }
 
-    // Revalidate pages
+    // Revalidate paths
     revalidatePath('/dashboard/admin/tryouts')
     revalidatePath('/dashboard/guru/tryouts')
-    revalidatePath(`/dashboard/admin/tryouts/${id}`)
-    revalidatePath(`/dashboard/guru/tryouts/${id}`)
+    revalidatePath(`/dashboard/admin/tryouts/${tryoutId}`)
+    revalidatePath(`/dashboard/guru/tryouts/${tryoutId}`)
 
-    return {
-      success: true,
-      data: tryout,
-    }
+    return { success: true, data: tryout as TryoutRow }
   } catch (error) {
     console.error('Update tryout exception:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+    const message = error instanceof Error ? error.message : 'Failed to update tryout'
+    return { success: false, error: message }
   }
 }
 

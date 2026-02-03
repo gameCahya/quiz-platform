@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, Controller } from 'react-hook-form'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import type { PricingModel } from '@/types/tryout'
+import { createTryout, updateTryout } from '@/app/actions/tryout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -16,87 +18,120 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import type { CreateTryoutInput, PricingModel } from '@/types/tryout'
-import { createTryout } from '@/app/actions/tryout'
-import { Loader2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-type TryoutFormProps = {
-  role: 'admin' | 'guru'
-  schools: Array<{ id: string; name: string }>
-}
-
-type FormData = {
+interface TryoutFormData {
   title: string
   description: string
-  school_id: string
-  is_global: boolean
   pricing_model: PricingModel
   tryout_price: number
   explanation_price: number
   has_explanation: boolean
-  duration_minutes: number | null
+  is_global: boolean
+  school_id: string
+  duration_minutes: number
   start_time: string
   end_time: string
 }
 
-export function TryoutForm({ role, schools }: TryoutFormProps) {
+interface TryoutFormProps {
+  mode: 'create' | 'edit'
+  tryoutId?: string
+  initialData?: Partial<TryoutFormData>
+  role: 'admin' | 'guru'
+  userSchoolId: string
+  schools: Array<{ id: string; name: string }>
+}
+
+export function TryoutForm({
+  mode = 'create',
+  tryoutId,
+  initialData,
+  role,
+  userSchoolId,
+  schools,
+}: TryoutFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const defaultValues: TryoutFormData = {
+    title: initialData?.title || '',
+    description: initialData?.description || '',
+    pricing_model: initialData?.pricing_model || 'free',
+    tryout_price: initialData?.tryout_price || 0,
+    explanation_price: initialData?.explanation_price || 0,
+    has_explanation: initialData?.has_explanation ?? true,
+    is_global: initialData?.is_global ?? false,
+    school_id: initialData?.school_id || userSchoolId,
+    duration_minutes: initialData?.duration_minutes || 90,
+    start_time: initialData?.start_time || '',
+    end_time: initialData?.end_time || '',
+  }
+
   const {
-    register,
-    handleSubmit,
     control,
+    handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({
-    defaultValues: {
-      title: '',
-      description: '',
-      school_id: '',
-      is_global: role === 'admin' ? false : false,
-      pricing_model: 'free',
-      tryout_price: 0,
-      explanation_price: 0,
-      has_explanation: true,
-      duration_minutes: null,
-      start_time: '',
-      end_time: '',
-    },
+  } = useForm<TryoutFormData>({
+    defaultValues,
   })
 
-  // Handle form submission
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: TryoutFormData) => {
     setIsSubmitting(true)
 
     try {
-      const input: CreateTryoutInput = {
-        title: data.title,
-        description: data.description || undefined,
-        school_id: data.school_id || null,
-        is_global: data.is_global,
-        pricing_model: data.pricing_model,
-        tryout_price: data.tryout_price,
-        explanation_price: data.explanation_price,
-        has_explanation: data.has_explanation,
-        duration_minutes: data.duration_minutes || null,
-        start_time: data.start_time || null,
-        end_time: data.end_time || null,
+      let result
+
+      if (mode === 'edit' && tryoutId) {
+        // Update existing tryout
+        result = await updateTryout(tryoutId, {
+          title: data.title,
+          description: data.description,
+          pricing_model: data.pricing_model,
+          tryout_price: data.pricing_model === 'premium' ? data.tryout_price : 0,
+          explanation_price: data.pricing_model === 'freemium' ? data.explanation_price : 0,
+          has_explanation: data.has_explanation,
+          is_global: role === 'admin' ? data.is_global : false,
+          school_id: !data.is_global ? data.school_id : undefined,
+          duration_minutes: data.duration_minutes,
+          start_time: data.start_time || undefined,
+          end_time: data.end_time || undefined,
+        })
+      } else {
+        // Create new tryout
+        result = await createTryout({
+          title: data.title,
+          description: data.description,
+          pricing_model: data.pricing_model,
+          tryout_price: data.pricing_model === 'premium' ? data.tryout_price : 0,
+          explanation_price: data.pricing_model === 'freemium' ? data.explanation_price : 0,
+          has_explanation: data.has_explanation,
+          is_global: role === 'admin' ? data.is_global : false,
+          school_id: !data.is_global ? data.school_id : undefined,
+          duration_minutes: data.duration_minutes,
+          start_time: data.start_time || undefined,
+          end_time: data.end_time || undefined,
+        })
       }
 
-      const result = await createTryout(input)
-
       if (result.success && result.data) {
-        // Redirect to tryout list
         const basePath = role === 'admin' ? '/dashboard/admin' : '/dashboard/guru'
-        router.push(`${basePath}/tryouts`)
+        
+        if (mode === 'edit') {
+          // Redirect back to tryout list after edit
+          router.push(`${basePath}/tryouts`)
+        } else {
+          // Redirect to questions page after create
+          router.push(`${basePath}/tryouts/${result.data.id}/questions`)
+        }
+        router.refresh()
       } else {
         alert(`Error: ${result.error}`)
-        setIsSubmitting(false)
       }
     } catch (error) {
       console.error('Submit error:', error)
-      alert('Terjadi kesalahan. Silakan coba lagi.')
+      alert('Terjadi kesalahan saat menyimpan tryout')
+    } finally {
       setIsSubmitting(false)
     }
   }
@@ -107,109 +142,89 @@ export function TryoutForm({ role, schools }: TryoutFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Informasi Dasar</CardTitle>
-          <CardDescription>Informasi umum tentang tryout</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title">
-              Judul Tryout <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="title"
-              placeholder="contoh: Tryout UTBK Saintek 2026"
-              {...register('title', {
-                required: 'Judul harus diisi',
-                minLength: {
-                  value: 3,
-                  message: 'Judul minimal 3 karakter',
-                },
-                maxLength: {
-                  value: 200,
-                  message: 'Judul maksimal 200 karakter',
-                },
-              })}
+            <Label htmlFor="title">Judul Tryout *</Label>
+            <Controller
+              name="title"
+              control={control}
+              rules={{ required: 'Judul harus diisi' }}
+              render={({ field }) => (
+                <>
+                  <Input
+                    id="title"
+                    placeholder="Contoh: Tryout UTBK Saintek 2026"
+                    {...field}
+                  />
+                  {errors.title && (
+                    <p className="text-sm text-red-600">{errors.title.message}</p>
+                  )}
+                </>
+              )}
             />
-            {errors.title && (
-              <p className="text-sm text-red-600">{errors.title.message}</p>
-            )}
           </div>
 
           {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Deskripsi</Label>
-            <Textarea
-              id="description"
-              placeholder="Jelaskan tentang tryout ini..."
-              rows={4}
-              {...register('description', {
-                maxLength: {
-                  value: 1000,
-                  message: 'Deskripsi maksimal 1000 karakter',
-                },
-              })}
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <Textarea
+                  id="description"
+                  placeholder="Jelaskan tentang tryout ini..."
+                  rows={4}
+                  {...field}
+                />
+              )}
             />
-            {errors.description && (
-              <p className="text-sm text-red-600">{errors.description.message}</p>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Target Audience */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Target Peserta</CardTitle>
-          <CardDescription>Siapa yang bisa mengakses tryout ini</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Global/School (Admin only) */}
-          {role === 'admin' && (
-            <div className="space-y-2">
-              <Label>Jangkauan</Label>
-              <Controller
-                name="is_global"
-                control={control}
-                render={({ field }) => (
-                  <RadioGroup
-                    value={field.value.toString()}
-                    onValueChange={(value) => field.onChange(value === 'true')}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="true" id="global" />
-                      <Label htmlFor="global" className="font-normal">
-                        Global (Semua siswa)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="false" id="school" />
-                      <Label htmlFor="school" className="font-normal">
-                        Tingkat Sekolah
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                )}
-              />
-            </div>
-          )}
-
-          {/* School Selection (Admin only, if not global) */}
-          {role === 'admin' && (
+      {/* Targeting (Admin only) */}
+      {role === 'admin' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Jangkauan Tryout</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <Controller
               name="is_global"
               control={control}
               render={({ field: isGlobalField }) => (
                 <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="is_global">Tryout Global</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Tryout dapat diakses oleh semua siswa
+                      </p>
+                    </div>
+                    <Switch
+                      id="is_global"
+                      checked={isGlobalField.value}
+                      onCheckedChange={isGlobalField.onChange}
+                    />
+                  </div>
+
                   {!isGlobalField.value && (
-                    <div className="space-y-2">
-                      <Label htmlFor="school_id">Pilih Sekolah</Label>
-                      <Controller
-                        name="school_id"
-                        control={control}
-                        render={({ field }) => (
-                          <Select value={field.value} onValueChange={field.onChange}>
+                    <Controller
+                      name="school_id"
+                      control={control}
+                      rules={{ required: 'Pilih sekolah' }}
+                      render={({ field: schoolField }) => (
+                        <div className="space-y-2">
+                          <Label htmlFor="school_id">Pilih Sekolah *</Label>
+                          <Select
+                            value={schoolField.value}
+                            onValueChange={schoolField.onChange}
+                          >
                             <SelectTrigger>
-                              <SelectValue placeholder="Pilih sekolah..." />
+                              <SelectValue placeholder="Pilih sekolah" />
                             </SelectTrigger>
                             <SelectContent>
                               {schools.map((school) => (
@@ -219,28 +234,26 @@ export function TryoutForm({ role, schools }: TryoutFormProps) {
                               ))}
                             </SelectContent>
                           </Select>
-                        )}
-                      />
-                    </div>
+                          {errors.school_id && (
+                            <p className="text-sm text-red-600">
+                              {errors.school_id.message}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    />
                   )}
                 </>
               )}
             />
-          )}
-
-          {role === 'guru' && (
-            <p className="text-sm text-gray-600">
-              Tryout ini hanya akan terlihat oleh siswa di sekolah Anda
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pricing Model */}
       <Card>
         <CardHeader>
           <CardTitle>Model Harga</CardTitle>
-          <CardDescription>Tentukan model bisnis tryout</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Controller
@@ -250,191 +263,164 @@ export function TryoutForm({ role, schools }: TryoutFormProps) {
               <>
                 <RadioGroup
                   value={pricingField.value}
-                  onValueChange={(value) => pricingField.onChange(value as PricingModel)}
+                  onValueChange={pricingField.onChange}
                 >
-                  {/* Free */}
-                  <div className="flex items-start space-x-2 rounded-lg border p-4">
-                    <RadioGroupItem value="free" id="free" className="mt-1" />
-                    <div className="flex-1">
-                      <Label htmlFor="free" className="font-semibold">
-                        Gratis Total
-                      </Label>
-                      <p className="text-sm text-gray-600">
-                        Tryout dan pembahasan gratis untuk semua siswa
-                      </p>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="free" id="pricing-free" />
+                    <Label htmlFor="pricing-free">Gratis Total</Label>
                   </div>
-
-                  {/* Freemium */}
-                  <div className="flex items-start space-x-2 rounded-lg border p-4">
-                    <RadioGroupItem value="freemium" id="freemium" className="mt-1" />
-                    <div className="flex-1">
-                      <Label htmlFor="freemium" className="font-semibold">
-                        Freemium
-                      </Label>
-                      <p className="text-sm text-gray-600">
-                        Tryout gratis, pembahasan berbayar
-                      </p>
-
-                      {pricingField.value === 'freemium' && (
-                        <Controller
-                          name="explanation_price"
-                          control={control}
-                          render={({ field: priceField }) => (
-                            <div className="mt-4 space-y-2">
-                              <Label htmlFor="explanation_price">
-                                Harga Pembahasan (Rp)
-                              </Label>
-                              <Input
-                                id="explanation_price"
-                                type="number"
-                                min="0"
-                                value={priceField.value}
-                                onChange={(e) =>
-                                  priceField.onChange(Number(e.target.value))
-                                }
-                              />
-                              <div className="flex gap-2">
-                                {[10000, 15000, 25000, 35000, 50000].map((price) => (
-                                  <Button
-                                    key={price}
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => priceField.onChange(price)}
-                                  >
-                                    {price / 1000}k
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        />
-                      )}
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="freemium" id="pricing-freemium" />
+                    <Label htmlFor="pricing-freemium">
+                      Freemium (Tryout gratis, Pembahasan berbayar)
+                    </Label>
                   </div>
-
-                  {/* Premium */}
-                  <div className="flex items-start space-x-2 rounded-lg border p-4">
-                    <RadioGroupItem value="premium" id="premium" className="mt-1" />
-                    <div className="flex-1">
-                      <Label htmlFor="premium" className="font-semibold">
-                        Premium Bundle
-                      </Label>
-                      <p className="text-sm text-gray-600">
-                        Tryout + pembahasan berbayar (paket lengkap)
-                      </p>
-
-                      {pricingField.value === 'premium' && (
-                        <Controller
-                          name="tryout_price"
-                          control={control}
-                          render={({ field: priceField }) => (
-                            <div className="mt-4 space-y-2">
-                              <Label htmlFor="tryout_price">Harga Paket (Rp)</Label>
-                              <Input
-                                id="tryout_price"
-                                type="number"
-                                min="0"
-                                value={priceField.value}
-                                onChange={(e) =>
-                                  priceField.onChange(Number(e.target.value))
-                                }
-                              />
-                              <div className="flex gap-2">
-                                {[25000, 35000, 50000, 75000, 100000].map((price) => (
-                                  <Button
-                                    key={price}
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => priceField.onChange(price)}
-                                  >
-                                    {price / 1000}k
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        />
-                      )}
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="premium" id="pricing-premium" />
+                    <Label htmlFor="pricing-premium">
+                      Premium (Tryout + Pembahasan berbayar)
+                    </Label>
                   </div>
                 </RadioGroup>
+
+                {/* Freemium Price */}
+                {pricingField.value === 'freemium' && (
+                  <Controller
+                    name="explanation_price"
+                    control={control}
+                    render={({ field: priceField }) => (
+                      <div className="space-y-2 mt-4">
+                        <Label htmlFor="explanation_price">
+                          Harga Pembahasan (Rp)
+                        </Label>
+                        <Input
+                          id="explanation_price"
+                          type="number"
+                          min={0}
+                          value={priceField.value}
+                          onChange={(e) => priceField.onChange(parseInt(e.target.value) || 0)}
+                        />
+                        <div className="flex gap-2">
+                          {[10000, 15000, 25000, 35000, 50000].map((price) => (
+                            <Button
+                              key={price}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => priceField.onChange(price)}
+                            >
+                              {price / 1000}k
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  />
+                )}
+
+                {/* Premium Price */}
+                {pricingField.value === 'premium' && (
+                  <Controller
+                    name="tryout_price"
+                    control={control}
+                    render={({ field: priceField }) => (
+                      <div className="space-y-2 mt-4">
+                        <Label htmlFor="tryout_price">
+                          Harga Bundle (Tryout + Pembahasan)
+                        </Label>
+                        <Input
+                          id="tryout_price"
+                          type="number"
+                          min={0}
+                          value={priceField.value}
+                          onChange={(e) => priceField.onChange(parseInt(e.target.value) || 0)}
+                        />
+                        <div className="flex gap-2">
+                          {[15000, 25000, 35000, 50000, 75000, 100000].map((price) => (
+                            <Button
+                              key={price}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => priceField.onChange(price)}
+                            >
+                              {price / 1000}k
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  />
+                )}
               </>
             )}
           />
         </CardContent>
       </Card>
 
-      {/* Settings */}
+      {/* Duration & Schedule */}
       <Card>
         <CardHeader>
-          <CardTitle>Pengaturan</CardTitle>
-          <CardDescription>Durasi dan jadwal tryout</CardDescription>
+          <CardTitle>Durasi & Jadwal</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Duration */}
           <div className="space-y-2">
-            <Label htmlFor="duration_minutes">Durasi (menit)</Label>
-            <Input
-              id="duration_minutes"
-              type="number"
-              min="1"
-              max="480"
-              placeholder="contoh: 120"
-              {...register('duration_minutes', {
-                valueAsNumber: true,
-              })}
+            <Label htmlFor="duration_minutes">Durasi (menit) *</Label>
+            <Controller
+              name="duration_minutes"
+              control={control}
+              rules={{
+                required: 'Durasi harus diisi',
+                min: { value: 1, message: 'Minimal 1 menit' },
+              }}
+              render={({ field }) => (
+                <>
+                  <Input
+                    id="duration_minutes"
+                    type="number"
+                    min={1}
+                    {...field}
+                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                  />
+                  {errors.duration_minutes && (
+                    <p className="text-sm text-red-600">
+                      {errors.duration_minutes.message}
+                    </p>
+                  )}
+                </>
+              )}
             />
-            <p className="text-sm text-gray-500">
-              Kosongkan jika tidak ada batasan waktu
-            </p>
           </div>
 
           {/* Start Time */}
           <div className="space-y-2">
-            <Label htmlFor="start_time">Waktu Mulai (opsional)</Label>
-            <Input
-              id="start_time"
-              type="datetime-local"
-              {...register('start_time')}
+            <Label htmlFor="start_time">Mulai (opsional)</Label>
+            <Controller
+              name="start_time"
+              control={control}
+              render={({ field }) => (
+                <Input id="start_time" type="datetime-local" {...field} />
+              )}
             />
           </div>
 
           {/* End Time */}
           <div className="space-y-2">
-            <Label htmlFor="end_time">Waktu Selesai (opsional)</Label>
-            <Input id="end_time" type="datetime-local" {...register('end_time')} />
+            <Label htmlFor="end_time">Selesai (opsional)</Label>
+            <Controller
+              name="end_time"
+              control={control}
+              render={({ field }) => (
+                <Input id="end_time" type="datetime-local" {...field} />
+              )}
+            />
           </div>
-
-          {/* Has Explanation */}
-          <Controller
-            name="has_explanation"
-            control={control}
-            render={({ field }) => (
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <Label htmlFor="has_explanation" className="font-semibold">
-                    Sertakan Pembahasan
-                  </Label>
-                  <p className="text-sm text-gray-600">
-                    Aktifkan jika tryout memiliki pembahasan
-                  </p>
-                </div>
-                <Switch
-                  id="has_explanation"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </div>
-            )}
-          />
         </CardContent>
       </Card>
 
-      {/* Submit Button */}
-      <div className="flex justify-end gap-4">
+      {/* Submit Buttons */}
+      <div className="flex gap-3">
         <Button
           type="button"
           variant="outline"
@@ -443,9 +429,14 @@ export function TryoutForm({ role, schools }: TryoutFormProps) {
         >
           Batal
         </Button>
-        <Button type="submit" disabled={isSubmitting} className="gap-2">
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isSubmitting ? 'Membuat...' : 'Buat Tryout'}
+        <Button type="submit" disabled={isSubmitting} className="flex-1">
+          {isSubmitting
+            ? mode === 'edit'
+              ? 'Menyimpan...'
+              : 'Membuat...'
+            : mode === 'edit'
+              ? 'Simpan Perubahan'
+              : 'Buat Tryout'}
         </Button>
       </div>
     </form>

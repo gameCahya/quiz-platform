@@ -88,10 +88,21 @@ export type CreateTryoutInput = {
 /**
  * Form data for updating tryout
  */
-export type UpdateTryoutInput = Partial<CreateTryoutInput> & {
-  id: string
-}
 
+export type UpdateTryoutInput = {
+  // NO id field here!
+  title?: string
+  description?: string
+  pricing_model?: PricingModel
+  tryout_price?: number
+  explanation_price?: number
+  has_explanation?: boolean
+  is_global?: boolean
+  school_id?: string
+  duration_minutes?: number
+  start_time?: string
+  end_time?: string
+}
 /**
  * Tryout with creator info (for list views)
  */
